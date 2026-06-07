@@ -1,0 +1,13 @@
+{
+  "sources": [
+    {
+      "name": "agency-agents",
+      "repo": "https://github.com/wshobson/agents",
+      "license": "MIT",
+      "ref": "cf6059d030bf4fe96623ae2e596d2f31e35fedc0",
+      "map": [
+        { "type": "agent", "glob": "plugins/*/agents/*.md" }
+      ]
+    }
+  ]
+}

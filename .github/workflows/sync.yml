@@ -1,0 +1,43 @@
+name: sync-sources
+
+# Ingest open-source sources declared in sources.json (verbatim copy + index
+# rebuild) and commit any changes. Pinned sha → re-runs are byte-identical, so
+# a commit appears only when sources.json bumps a ref (or a source changes).
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly, Mondays 06:00 UTC.
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run ingestion
+        run: python3 scripts/sync.py
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "chore(sync): ingest sources via scripts/sync.py"
+            git push
+          else
+            echo "no changes to commit"
+          fi

@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "name": "ccteam-hub",
+  "description": "ccteam plugin marketplace — roles/agents, skills, workflows (self-built + open-source). Consumed by ccteam's marketplace UI/CLI.",
+  "plugins": []
+}

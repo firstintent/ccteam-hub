@@ -192,7 +192,7 @@
       "name": "autoloop",
       "description": "把一个 role / prompt / 工作流对着你定义的 benchmark 可量化地越改越好:变异 → 评测 → 多裁判打分 → 赢则保留、输则回滚,在护栏内(变异上限 / 停止条件 / 证据门槛)迭代,可无人值守过夜跑。当想让某个 agent / 角色在能打分的任务上自我改进(而非只重试)时用;前提是先有可机器打分的 eval。",
       "path": "skills/autoloop/SKILL.md",
-      "content_sha": "5f591703998bbd05f00e75b56b1f5516b3848655eb847cbf12c7589b8b8e160e",
+      "content_sha": "5505063062b95fabc8610465e8a1d3ce6ed86bcedfa1f2c3d2b57197d17827df",
       "source": "ccteam",
       "upstream": "https://github.com/firstintent/ccteam",
       "license": "MIT",

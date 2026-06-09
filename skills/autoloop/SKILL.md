@@ -5,6 +5,8 @@ description: 把一个 role / prompt / 工作流对着你定义的 benchmark 可
 
 # Autoloop — 自改进循环
 
+> **通用 skill,装进项目用。** 优化的是**你这个项目自己的** role / prompt / 工作流(对着你领域的 benchmark)—— 比如把一个 QA / 安全 / 交易 / 研究 角色越练越准。ccteam 只是提供 `session_*` / `advise` 这套执行底座;这个 skill **不改 ccteam 本身**,改的是你项目里被优化的那个产物。
+
 普通循环是「执行 → 重试」,把烂流程转一千遍还是烂。**Autoloop 只多一样东西:eval(评测基准)** —— 有了它,每轮能并排问「新版 vs 旧版,在我真正在意的指标上哪个更高」,循环才是**爬坡**而不是空转。选手和裁判都是 session,全程用 ccteam 的 `session_*` + `advise` 工具,不写代码。
 
 > **铁律:没有 eval 就没有 autoloop。** 开跑前先能回答「机器可评分的『好』长什么样」。答不上来 → 先去写 benchmark —— 这是第一步,也是最多人跳过的一步。eval 不是前提条件,eval 就是产品本身。

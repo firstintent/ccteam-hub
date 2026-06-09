@@ -33,7 +33,7 @@ LICENSES/      各开源来源的 LICENSE 原文(+ repo + sha 头)
       "description": "…",             // 取 frontmatter description(截断到 ~400 字)
       "path": "agents/backend-development-graphql-architect.md", // 仓内相对路径
       "content_sha": "…",             // 拷入文件字节的 sha256(完整性 + diff 检测)
-      "source": "agency-agents",       // "builtin" | "agency-agents" | "<其它开源源>"
+      "source": "agency-agents",       // "ccteam"(官方一等,市场置顶推荐) | "agency-agents" | "<其它开源源>"
       "upstream": "https://github.com/wshobson/agents/blob/<sha>/plugins/…/x.md", // 原始出处
       "license": "MIT",
       "tags": ["backend-development"]  // [division]
@@ -44,7 +44,7 @@ LICENSES/      各开源来源的 LICENSE 原文(+ repo + sha 头)
 
 ## 来源(source)与 ingestion
 
-- **builtin**:本仓自建插件(直接写入 `agents/` 等,不经 ingestion)。
+- **ccteam**(官方一等):ccteam 官方插件 —— **本仓自建**(直接写入 `agents/`/`skills/`/`workflows/`,不经 ingestion;`source` 标 `"ccteam"`)。在 ccteam 市场浏览(web 卡片 + CLI `role/skill search`)中**置顶推荐**(featured),其余来源依次排其后(引擎侧 `HubIndex::sort_ccteam_first`)。**无单独 `official` 字段** —— source 名 `ccteam` 即标识。
 - **开源接入**:由 `sources.json` 声明,经 `scripts/sync.py` 同步进来,**保留来源 + license + upstream URL**;`.md` 内容 **verbatim**,仅 sanitize 文件名(stem)到 `[a-z0-9_-]`。
 
 当前 `sources.json`:

@@ -1,6 +1,7 @@
 ---
 name: pk
 description: 让两个或多个 vendor(如 Claude 和 Codex)并行做同一个任务,再盲评对比、推荐更优的一方。当用户想让不同引擎/模型 PK、要第二种实现、或对同一任务 A/B 两种方案时使用。
+tags: orchestration
 ---
 
 # PK — 多 vendor 同台竞速

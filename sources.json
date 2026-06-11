@@ -8,6 +8,15 @@
       "map": [
         { "type": "agent", "glob": "plugins/*/agents/*.md" }
       ]
+    },
+    {
+      "name": "mattpocock-skills",
+      "repo": "https://github.com/mattpocock/skills",
+      "license": "MIT",
+      "ref": "be55a7970319ede7965edbb02b5e41cba1ca82c9",
+      "map": [
+        { "type": "skill", "glob": "skills/**/SKILL.md" }
+      ]
     }
   ]
 }

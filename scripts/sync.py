@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
-"""ccteam-hub ingestion pipeline.
+"""ccteam-hub ingestion — track-upstream model.
 
-Reads sources.json, clones each open-source source at a pinned sha, globs the
-declared content files, copies them VERBATIM into the hub (agents/ skills/
-workflows/), and rebuilds index.json.
+Rebuilds index.json as UPSTREAM POINTERS: each plugin stores `upstream` (a
+raw-fetchable URL @sha) + `content_sha` read from the source — the body is
+NOT copied into the hub. Multi-file skills carry a `manifest` of every file
+(relpath + content_sha). First-party hub-local content (source="ccteam")
+stays vendored in the hub and points `upstream` at the hub's own raw URL
+(the hub IS the upstream for content it ships itself).
 
-Design constraints (see ccteam-hub/README.md):
+Inputs:
+  - sources.json — external sources (repo @pinned-sha + glob map). Cloned,
+    globbed, turned into pointers; bodies are NOT copied into the hub.
+  - the hub's own agents/ skills/ workflows/ trees — first-party content.
+
+Design constraints (see README):
   - stdlib only (subprocess/json/hashlib/pathlib/re/glob).
-  - IDEMPOTENT: re-running with the same pinned sha produces a BYTE-IDENTICAL
-    tree. No wall-clock timestamps; deterministic ordering everywhere.
-  - Content is verbatim; only the on-disk filename (`id`) is sanitized to
-    [a-z0-9_-]. Collisions across divisions get a `<division>-` prefix.
+  - IDEMPOTENT: re-running at the same pinned sha is byte-identical (no
+    wall-clock; deterministic ordering everywhere).
+  - content_sha is computed over the SOURCE bytes; only `id` is sanitized to
+    [a-z0-9_-] (collisions across divisions get a `<division>-` prefix).
   - Attribution preserved: per-source LICENSE captured under LICENSES/.
 
 Usage:  python3 scripts/sync.py
@@ -22,10 +30,10 @@ import glob as globmod
 import hashlib
 import json
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
+from collections import Counter
 from pathlib import Path
 
 # Repo root = parent of this script's dir (scripts/).
@@ -34,20 +42,26 @@ SOURCES_FILE = ROOT / "sources.json"
 INDEX_FILE = ROOT / "index.json"
 LICENSES_DIR = ROOT / "LICENSES"
 
-# type -> hub subdirectory.
+# type -> hub subdirectory (for the first-party scan).
 TYPE_DIR = {"agent": "agents", "skill": "skills", "workflow": "workflows"}
 
-# Cap stored description length (full text stays verbatim in the .md body).
+# Cap stored description length (full text stays in the upstream body).
 DESC_MAX = 400
 
 LICENSE_CANDIDATES = ("LICENSE", "LICENSE.md", "LICENSE.txt", "LICENSE.MIT", "COPYING")
+
+# First-party content points `upstream` at the hub's own raw tree on `main`
+# (the hub IS the upstream for content it vendors itself). Keep in sync with
+# `ccteam_core::HUB_RAW_BASE`.
+HUB_RAW_BASE = "https://raw.githubusercontent.com/firstintent/ccteam-hub/main"
+FIRST_PARTY_SOURCE = "ccteam"
+FIRST_PARTY_LICENSE = "MIT"
 
 
 # --------------------------------------------------------------------------- #
 # helpers
 # --------------------------------------------------------------------------- #
 def run(args: list[str], cwd: Path | None = None) -> str:
-    """Run a command, return stdout (text), raise on non-zero."""
     res = subprocess.run(
         args,
         cwd=str(cwd) if cwd else None,
@@ -66,23 +80,19 @@ def sanitize(stem: str) -> str:
     return s.strip("-")
 
 
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
 def sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    h.update(path.read_bytes())
-    return h.hexdigest()
+    return sha256_bytes(path.read_bytes())
 
 
 def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
-    """Return (frontmatter dict, body-after-frontmatter).
-
-    Only top-level `key: value` lines in a leading `---`..`---` block are
-    parsed (sufficient for name/description). Returns ({}, full text) when no
-    frontmatter is present.
-    """
+    """Parse top-level `key: value` lines in a leading `---`..`---` block."""
     if not text.startswith("---"):
         return {}, text
     lines = text.splitlines()
-    # First line is the opening '---'; find the closing one.
     end = None
     for i in range(1, len(lines)):
         if lines[i].strip() == "---":
@@ -95,14 +105,13 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
         m = re.match(r"^([A-Za-z0-9_-]+):\s*(.*)$", line)
         if m:
             fm[m.group(1)] = m.group(2).strip()
-    body = "\n".join(lines[end + 1 :])
-    return fm, body
+    return fm, "\n".join(lines[end + 1 :])
 
 
-def derive_meta(text: str, stem: str) -> tuple[str, str]:
-    """Derive (name, description) with fallbacks. Description truncated."""
+def derive_meta(text: str, fallback_name: str) -> tuple[str, str, list[str]]:
+    """Derive (name, description, frontmatter-tags). Description truncated."""
     fm, body = parse_frontmatter(text)
-    name = fm.get("name", "").strip() or stem
+    name = fm.get("name", "").strip() or fallback_name
     desc = fm.get("description", "").strip()
     if not desc:
         for line in body.splitlines():
@@ -111,8 +120,17 @@ def derive_meta(text: str, stem: str) -> tuple[str, str]:
                 break
     desc = re.sub(r"\s+", " ", desc).strip()
     if len(desc) > DESC_MAX:
-        desc = desc[: DESC_MAX - 1].rstrip() + "…"  # ellipsis
-    return name, desc
+        desc = desc[: DESC_MAX - 1].rstrip() + "…"
+    tags_raw = fm.get("tags", "").strip()
+    tags = [sanitize(t) for t in re.split(r"[,\s]+", tags_raw) if t.strip()] if tags_raw else []
+    return name, desc, tags
+
+
+def raw_url(repo: str, sha: str, relpath: str) -> str:
+    """A github repo URL + sha + relpath -> a raw.githubusercontent.com URL."""
+    owner_repo = re.sub(r"^https?://github\.com/", "", repo.rstrip("/"))
+    owner_repo = re.sub(r"\.git$", "", owner_repo)
+    return f"https://raw.githubusercontent.com/{owner_repo}/{sha}/{relpath}"
 
 
 def find_license(repo_dir: Path) -> Path | None:
@@ -123,98 +141,152 @@ def find_license(repo_dir: Path) -> Path | None:
     return None
 
 
-# --------------------------------------------------------------------------- #
-# core
-# --------------------------------------------------------------------------- #
 def clone_at_ref(repo: str, ref: str, dest: Path) -> str:
     """Full clone + checkout an arbitrary sha. Returns the source commit date
     (strict ISO-8601, %cI) for deterministic provenance stamping."""
     run(["git", "clone", "--quiet", repo, str(dest)])
     run(["git", "-C", str(dest), "checkout", "--quiet", ref])
-    commit_date = run(["git", "-C", str(dest), "show", "-s", "--format=%cI", ref]).strip()
-    return commit_date
+    return run(["git", "-C", str(dest), "show", "-s", "--format=%cI", ref]).strip()
 
 
-def collect_entries(source: dict, repo_dir: Path):
-    """Glob the source, resolve globally-unique ids, return (entries, collisions).
+def skill_manifest(skill_dir: Path) -> list[dict[str, str]]:
+    """Every file under a skill dir (sorted posix relpaths) →
+    [{relpath, content_sha}]. SKILL.md is included; len >= 1."""
+    files = sorted(p for p in skill_dir.rglob("*") if p.is_file())
+    return [
+        {"relpath": p.relative_to(skill_dir).as_posix(), "content_sha": sha256_file(p)}
+        for p in files
+    ]
 
-    A sanitized stem appearing in >1 directory is a collision: ALL of its
-    instances get a `<division>-` prefix (deterministic — never arbitrary which
-    keeps the bare stem). Single-occurrence stems keep the bare sanitized stem.
-    """
+
+def id_and_division(etype: str, rel: str) -> tuple[str, str]:
+    """(id-candidate, division). Skills key off the DIR name — fixes the
+    `*/SKILL.md` stem='SKILL' dup-crash; agents key off the file stem.
+    division (for the collision prefix + tag) = the first segment under the
+    type root (e.g. plugins/<div>/… or skills/<cat>/…)."""
+    parts = rel.split("/")
+    p = Path(rel)
+    if etype == "skill":
+        cand = p.parent.name
+    else:
+        cand = p.stem
+    division = parts[1] if len(parts) > 1 else parts[0]
+    return cand, division
+
+
+def make_entry(
+    etype: str,
+    iid: str,
+    src_path: Path,
+    upstream: str,
+    source: str,
+    license_id: str,
+    tags: list[str],
+) -> dict:
+    """Build one pointer entry. For a multi-file skill, attach a `manifest`
+    (every file under the skill dir); single-file gets no manifest."""
+    text = src_path.read_text(encoding="utf-8")
+    name, desc, fm_tags = derive_meta(text, iid)
+    entry = {
+        "id": iid,
+        "type": etype,
+        "name": name,
+        "description": desc,
+        "upstream": upstream,
+        "content_sha": sha256_file(src_path),
+        "source": source,
+        "license": license_id,
+        "tags": tags or fm_tags,
+    }
+    if etype == "skill":
+        manifest = skill_manifest(src_path.parent)
+        if len(manifest) > 1:
+            # relpaths are relative to the skill dir; `upstream` points at
+            # SKILL.md and the engine derives each file URL from its dirname.
+            entry["manifest"] = manifest
+    return entry
+
+
+# --------------------------------------------------------------------------- #
+# external sources
+# --------------------------------------------------------------------------- #
+def collect_external(source: dict, repo_dir: Path) -> list[dict]:
+    """Provisional pointer entries (id = bare candidate; `_div` carried for the
+    GLOBAL collision pass in main(), which is what makes ids unique across
+    sources + types, not just within one source)."""
     sname = source["name"]
     license_id = source.get("license", "")
     sha = source["ref"]
-    upstream_base = source["repo"].rstrip("/")
+    repo = source["repo"]
 
-    # Pass 1: gather (entry-type, division, sanitized-stem, rel-path) sorted.
-    raw: list[tuple[str, str, str, str]] = []
+    rows: list[tuple[str, str, str, str]] = []
     for m in source["map"]:
         etype = m["type"]
         if etype not in TYPE_DIR:
             raise SystemExit(f"unknown map type {etype!r} in source {sname}")
-        for abspath in globmod.glob(str(repo_dir / m["glob"])):
+        for abspath in globmod.glob(str(repo_dir / m["glob"]), recursive=True):
             rel = Path(abspath).relative_to(repo_dir).as_posix()
-            parts = rel.split("/")
-            # division = first path segment under the repo (e.g. plugins/<div>/...)
-            division = parts[1] if len(parts) > 1 else parts[0]
-            stem = Path(rel).stem
-            raw.append((etype, sanitize(division), sanitize(stem), rel))
-    raw.sort(key=lambda r: r[3])  # sort by rel path -> deterministic order
+            cand, division = id_and_division(etype, rel)
+            rows.append((etype, sanitize(division), sanitize(cand), rel))
+    rows.sort(key=lambda r: r[3])
 
-    # Pass 2: which sanitized stems collide (per type, to be safe).
-    counts: dict[tuple[str, str], int] = {}
-    for etype, _div, san_stem, _rel in raw:
-        counts[(etype, san_stem)] = counts.get((etype, san_stem), 0) + 1
-
-    entries = []
-    collisions = 0
-    seen_ids: set[str] = set()
-    for etype, san_div, san_stem, rel in raw:
-        if counts[(etype, san_stem)] > 1:
-            iid = f"{san_div}-{san_stem}"
-            collisions += 1
-        else:
-            iid = san_stem
-        if iid in seen_ids:
-            # Defensive: should not happen given upstream layout; make unique.
-            raise SystemExit(f"unexpected duplicate id {iid!r} (from {rel})")
-        seen_ids.add(iid)
-
-        src_path = repo_dir / rel
-        text = src_path.read_text(encoding="utf-8")
-        name, desc = derive_meta(text, san_stem)
-        subdir = TYPE_DIR[etype]
-        rel_out = f"{subdir}/{iid}.md"
-        entries.append(
-            {
-                "_src_abs": src_path,
-                "_rel_out": rel_out,
-                "id": iid,
-                "type": etype,
-                "name": name,
-                "description": desc,
-                "path": rel_out,
-                "content_sha": sha256_file(src_path),
-                "source": sname,
-                "upstream": f"{upstream_base}/blob/{sha}/{rel}",
-                "license": license_id,
-                "tags": [san_div],
-            }
+    entries: list[dict] = []
+    for etype, san_div, cand, rel in rows:
+        e = make_entry(
+            etype,
+            cand,
+            repo_dir / rel,
+            raw_url(repo, sha, rel),
+            sname,
+            license_id,
+            [san_div] if san_div else [],
         )
+        e["_div"] = san_div
+        entries.append(e)
+    return entries
+
+
+# --------------------------------------------------------------------------- #
+# first-party (hub-local)
+# --------------------------------------------------------------------------- #
+def collect_firstparty() -> list[dict]:
+    """Scan the hub's own trees — content ccteam ships itself. `upstream`
+    points at the hub's raw URL on `main`; tags come from frontmatter."""
+    entries: list[dict] = []
+    for abspath in sorted(globmod.glob(str(ROOT / "agents" / "*.md"))):
+        p = Path(abspath)
+        rel = p.relative_to(ROOT).as_posix()
+        entries.append(
+            make_entry(
+                "agent",
+                sanitize(p.stem),
+                p,
+                f"{HUB_RAW_BASE}/{rel}",
+                FIRST_PARTY_SOURCE,
+                FIRST_PARTY_LICENSE,
+                [],
+            )
+        )
+    for abspath in sorted(globmod.glob(str(ROOT / "skills" / "*" / "SKILL.md"))):
+        p = Path(abspath)
+        rel = p.relative_to(ROOT).as_posix()
+        entries.append(
+            make_entry(
+                "skill",
+                sanitize(p.parent.name),
+                p,
+                f"{HUB_RAW_BASE}/{rel}",
+                FIRST_PARTY_SOURCE,
+                FIRST_PARTY_LICENSE,
+                [],
+            )
+        )
+    # First-party has no division → the global collision pass falls back to the
+    # source name as the prefix (first-party ids rarely collide).
+    for e in entries:
+        e["_div"] = ""
     entries.sort(key=lambda e: e["id"])
-    return entries, collisions
-
-
-def clean_source_outputs(index: dict, source_name: str) -> None:
-    """Remove previously-synced files for this source so removed-upstream
-    files don't linger. Idempotent: deletes only paths recorded for the source
-    in the existing index that still exist on disk."""
-    for entry in index.get("plugins", []):
-        if entry.get("source") == source_name:
-            p = ROOT / entry["path"]
-            if p.is_file():
-                p.unlink()
+    return entries
 
 
 def write_license(repo_dir: Path, source: dict, commit_date: str) -> None:
@@ -222,7 +294,7 @@ def write_license(repo_dir: Path, source: dict, commit_date: str) -> None:
     lic = find_license(repo_dir)
     out = LICENSES_DIR / f"{source['name']}.LICENSE"
     header = (
-        f"Vendored into ccteam-hub from {source['repo']}\n"
+        f"Tracked by ccteam-hub from {source['repo']}\n"
         f"ref: {source['ref']}\n"
         f"commit date: {commit_date}\n"
         f"declared license: {source.get('license', '')}\n"
@@ -232,25 +304,36 @@ def write_license(repo_dir: Path, source: dict, commit_date: str) -> None:
     out.write_text(header + body, encoding="utf-8")
 
 
+def drop_vendored_external_bodies(old_index: dict) -> int:
+    """Track-upstream: the hub stores NO external bodies. Delete any body the
+    previous (vendor-copy) index recorded a hub-local `path` for, unless it's
+    first-party. Idempotent (only deletes files still on disk)."""
+    removed = 0
+    for e in old_index.get("plugins", []):
+        if e.get("source") == FIRST_PARTY_SOURCE:
+            continue
+        rel = e.get("path")
+        if rel:
+            p = ROOT / rel
+            if p.is_file():
+                p.unlink()
+                removed += 1
+    return removed
+
+
+# --------------------------------------------------------------------------- #
+# main
+# --------------------------------------------------------------------------- #
 def main() -> int:
     if not SOURCES_FILE.is_file():
         raise SystemExit(f"missing {SOURCES_FILE}")
     sources_doc = json.loads(SOURCES_FILE.read_text(encoding="utf-8"))
 
-    # Existing index (for cleanup of stale outputs). Preserve top-level meta.
-    if INDEX_FILE.is_file():
-        index = json.loads(INDEX_FILE.read_text(encoding="utf-8"))
-    else:
-        index = {"version": 1, "name": "ccteam-hub", "plugins": []}
+    old_index = json.loads(INDEX_FILE.read_text(encoding="utf-8")) if INDEX_FILE.is_file() else {}
+    removed = drop_vendored_external_bodies(old_index)
 
-    # Keep entries from sources NOT being re-synced this run; drop the rest as
-    # we rebuild them below.
-    synced_names = {s["name"] for s in sources_doc["sources"]}
-    retained = [e for e in index.get("plugins", []) if e.get("source") not in synced_names]
-
-    all_new_entries: list[dict] = []
-    latest_commit_date = None
-    total_collisions = 0
+    all_entries: list[dict] = []
+    latest_commit_date: str | None = None
 
     for source in sources_doc["sources"]:
         with tempfile.TemporaryDirectory(prefix="ccteam-hub-sync-") as tmp:
@@ -258,50 +341,55 @@ def main() -> int:
             commit_date = clone_at_ref(source["repo"], source["ref"], repo_dir)
             if latest_commit_date is None or commit_date > latest_commit_date:
                 latest_commit_date = commit_date
-
-            entries, collisions = collect_entries(source, repo_dir)
-            total_collisions += collisions
-
-            # Clean previously-synced outputs for this source, then re-copy.
-            clean_source_outputs(index, source["name"])
-            for e in entries:
-                dest = ROOT / e["_rel_out"]
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(e["_src_abs"], dest)
-
+            entries = collect_external(source, repo_dir)
             write_license(repo_dir, source, commit_date)
+            all_entries.extend(entries)
+            print(f"[{source['name']}] {len(entries)} pointer entries (ref {source['ref'][:12]})")
 
-            for e in entries:
-                e.pop("_src_abs", None)
-                e.pop("_rel_out", None)
-            all_new_entries.extend(entries)
-            print(
-                f"[{source['name']}] {len(entries)} entries, "
-                f"{collisions} collision-prefixed (ref {source['ref'][:12]})"
-            )
+    firstparty = collect_firstparty()
+    all_entries.extend(firstparty)
+    print(f"[{FIRST_PARTY_SOURCE} first-party] {len(firstparty)} entries")
 
-    plugins = retained + all_new_entries
-    plugins.sort(key=lambda e: e["id"])
+    # GLOBAL collision resolution: a bare id that appears more than once
+    # anywhere (across sources AND types) gets every instance prefixed with its
+    # division (or, for first-party, its source). This is what guarantees
+    # `HubIndex::find(id)` is unambiguous.
+    counts = Counter(e["id"] for e in all_entries)
+    total_collisions = 0
+    for e in all_entries:
+        if counts[e["id"]] > 1:
+            prefix = sanitize(e["_div"] or e["source"])
+            e["id"] = f"{prefix}-{e['id']}" if prefix else e["id"]
+            total_collisions += 1
+    for e in all_entries:
+        e.pop("_div", None)
+
+    # Stable global ordering + a hard dup-id guard (catches a residual clash
+    # that prefixing couldn't resolve).
+    all_entries.sort(key=lambda e: (e["id"], e["source"]))
+    seen: set[str] = set()
+    for e in all_entries:
+        if e["id"] in seen:
+            raise SystemExit(f"unresolved duplicate id after prefixing: {e['id']!r}")
+        seen.add(e["id"])
 
     out_index = {
-        "version": index.get("version", 1),
-        "name": index.get("name", "ccteam-hub"),
+        "version": old_index.get("version", 1),
+        "name": old_index.get("name", "ccteam-hub"),
     }
-    if "description" in index:
-        out_index["description"] = index["description"]
-    # Deterministic provenance stamp derived from source commit date (NOT
-    # wall-clock) so re-runs at the same sha are byte-identical.
+    if "description" in old_index:
+        out_index["description"] = old_index["description"]
     if latest_commit_date:
         out_index["generated_at"] = latest_commit_date
-    out_index["plugins"] = plugins
+    out_index["plugins"] = all_entries
 
     INDEX_FILE.write_text(
         json.dumps(out_index, indent=2, ensure_ascii=False, sort_keys=False) + "\n",
         encoding="utf-8",
     )
     print(
-        f"wrote {INDEX_FILE.name}: {len(plugins)} plugins "
-        f"({total_collisions} collision-prefixed total)"
+        f"wrote {INDEX_FILE.name}: {len(all_entries)} plugins "
+        f"({total_collisions} collision-prefixed, {removed} vendored bodies removed)"
     )
     return 0
 

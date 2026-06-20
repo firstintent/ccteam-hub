@@ -289,6 +289,43 @@ def collect_firstparty() -> list[dict]:
     return entries
 
 
+def collect_plugins(sources_doc: dict) -> list[dict]:
+    """Pointer entries for vendor-native Claude Code **plugins** declared in
+    sources.json's top-level `plugins` array.
+
+    A plugin is NOT vendored: ccteam never copies its body — it delegates the
+    install to Claude Code via a marketplace pointer (the engine writes
+    `extraKnownMarketplaces` + `enabledPlugins` into the project's
+    settings.local.json). So a plugin entry carries `{marketplace:{name,
+    source}, plugin_id}` and has NO `upstream` / `content_sha` / `manifest`.
+    `source` (provenance) defaults to `external`; it is never `ccteam`, so the
+    engine's `sort_ccteam_first` ranks plugins after first-party content."""
+    entries: list[dict] = []
+    for p in sources_doc.get("plugins", []):
+        desc = re.sub(r"\s+", " ", p.get("description", "")).strip()
+        if len(desc) > DESC_MAX:
+            desc = desc[: DESC_MAX - 1].rstrip() + "…"
+        entries.append(
+            {
+                "id": sanitize(p["id"]),
+                "type": "plugin",
+                "name": p.get("name", "").strip() or p["id"],
+                "description": desc,
+                "source": p.get("provenance", "external"),
+                "license": p.get("license", ""),
+                "tags": [sanitize(t) for t in p.get("tags", [])],
+                "marketplace": {
+                    "name": p["marketplace"],
+                    "source": p["marketplace_source"],
+                },
+                "plugin_id": p["plugin"],
+                "_div": "",
+            }
+        )
+    entries.sort(key=lambda e: e["id"])
+    return entries
+
+
 def write_license(repo_dir: Path, source: dict, commit_date: str) -> None:
     LICENSES_DIR.mkdir(parents=True, exist_ok=True)
     lic = find_license(repo_dir)
@@ -349,6 +386,10 @@ def main() -> int:
     firstparty = collect_firstparty()
     all_entries.extend(firstparty)
     print(f"[{FIRST_PARTY_SOURCE} first-party] {len(firstparty)} entries")
+
+    plugins = collect_plugins(sources_doc)
+    all_entries.extend(plugins)
+    print(f"[plugins] {len(plugins)} delegated marketplace pointer entries")
 
     # GLOBAL collision resolution: a bare id that appears more than once
     # anywhere (across sources AND types) gets every instance prefixed with its

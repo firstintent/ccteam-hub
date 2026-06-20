@@ -18,5 +18,17 @@
         { "type": "skill", "glob": "skills/**/SKILL.md" }
       ]
     }
+  ],
+  "plugins": [
+    {
+      "id": "understand-anything",
+      "name": "Understand Anything",
+      "description": "Turn any codebase into an explorable, searchable, conversational knowledge graph — multi-agent semantic analysis over tree-sitter ASTs. Commands: /understand, /understand-dashboard, /understand-chat, /understand-diff.",
+      "marketplace": "understand-anything",
+      "marketplace_source": { "source": "github", "repo": "Egonex-AI/Understand-Anything" },
+      "plugin": "understand-anything",
+      "license": "see upstream repo",
+      "tags": ["understand", "codebase", "knowledge-graph"]
+    }
   ]
 }

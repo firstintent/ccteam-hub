@@ -2943,6 +2943,27 @@
       ]
     },
     {
+      "id": "understand-anything",
+      "type": "plugin",
+      "name": "Understand Anything",
+      "description": "Turn any codebase into an explorable, searchable, conversational knowledge graph — multi-agent semantic analysis over tree-sitter ASTs. Commands: /understand, /understand-dashboard, /understand-chat, /understand-diff.",
+      "source": "external",
+      "license": "see upstream repo",
+      "tags": [
+        "understand",
+        "codebase",
+        "knowledge-graph"
+      ],
+      "marketplace": {
+        "name": "understand-anything",
+        "source": {
+          "source": "github",
+          "repo": "Egonex-AI/Understand-Anything"
+        }
+      },
+      "plugin_id": "understand-anything"
+    },
+    {
       "id": "unit-testing-debugger",
       "type": "agent",
       "name": "unit-testing-debugger",

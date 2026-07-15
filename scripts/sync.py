@@ -89,7 +89,10 @@ def sha256_file(path: Path) -> str:
 
 
 def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
-    """Parse top-level `key: value` lines in a leading `---`..`---` block."""
+    """Parse top-level `key: value` lines in a leading `---`..`---` block.
+    Handles YAML block scalars (`key: >-` / `key: |`) by folding the indented
+    continuation lines into a single space-joined value — enough for the
+    `name:`/`description:` fields the index needs, without a YAML dep."""
     if not text.startswith("---"):
         return {}, text
     lines = text.splitlines()
@@ -101,10 +104,25 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
     if end is None:
         return {}, text
     fm: dict[str, str] = {}
-    for line in lines[1:end]:
-        m = re.match(r"^([A-Za-z0-9_-]+):\s*(.*)$", line)
-        if m:
-            fm[m.group(1)] = m.group(2).strip()
+    i = 1
+    while i < end:
+        m = re.match(r"^([A-Za-z0-9_-]+):\s*(.*)$", lines[i])
+        if not m:
+            i += 1
+            continue
+        key, value = m.group(1), m.group(2).strip()
+        if value in (">", ">-", ">+", "|", "|-", "|+"):
+            block: list[str] = []
+            i += 1
+            while i < end and (
+                not lines[i].strip() or lines[i].startswith((" ", "\t"))
+            ):
+                block.append(lines[i].strip())
+                i += 1
+            fm[key] = " ".join(part for part in block if part)
+            continue
+        fm[key] = value
+        i += 1
     return fm, "\n".join(lines[end + 1 :])
 
 

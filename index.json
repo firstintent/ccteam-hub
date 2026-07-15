@@ -164,7 +164,7 @@
       "id": "arm-cortex-expert",
       "type": "agent",
       "name": "arm-cortex-expert",
-      "description": ">",
+      "description": "Senior embedded software engineer specializing in firmware and driver development for ARM Cortex-M microcontrollers (Teensy, STM32, nRF52, SAMD). Decades of experience writing reliable, optimized, and maintainable embedded code with deep expertise in memory barriers, DMA/cache coherency, interrupt-driven I/O, and peripheral drivers.",
       "upstream": "https://raw.githubusercontent.com/wshobson/agents/cf6059d030bf4fe96623ae2e596d2f31e35fedc0/plugins/arm-cortex-microcontrollers/agents/arm-cortex-expert.md",
       "content_sha": "cbc0df7ce3f46a0b380416f42a23a2302b0ef915a6d96e059030d70d9720de0e",
       "source": "agency-agents",
@@ -396,7 +396,7 @@
       "id": "caveman",
       "type": "skill",
       "name": "caveman",
-      "description": ">",
+      "description": "Ultra-compressed communication mode. Cuts token usage ~75% by dropping filler, articles, and pleasantries while keeping full technical accuracy. Use when user says \"caveman mode\", \"talk like caveman\", \"use caveman\", \"less tokens\", \"be brief\", or invokes /caveman.",
       "upstream": "https://raw.githubusercontent.com/mattpocock/skills/be55a7970319ede7965edbb02b5e41cba1ca82c9/skills/productivity/caveman/SKILL.md",
       "content_sha": "b4bb6fe3bf3da222993ca0aee5e7c6f5368b182dd30ce1172e8f8e3280eb7052",
       "source": "mattpocock-skills",
@@ -404,6 +404,28 @@
       "tags": [
         "productivity"
       ]
+    },
+    {
+      "id": "cct-codex",
+      "type": "skill",
+      "name": "cct-codex",
+      "description": "Hand a heavy or long-running implementation/coding task to a Codex session through ccteam, then supervise it to completion. Use when the user says \"用 cct-codex ...\", \"让 codex 做 ...\", \"交给 codex 实现 ...\", \"use codex to build/implement/refactor X via ccteam\", or otherwise wants a background Codex agent to grind through work while accounted in the ccteam ledger. This is the right tool for long impleme…",
+      "upstream": "https://raw.githubusercontent.com/firstintent/ccteam-hub/main/skills/cct-codex/SKILL.md",
+      "content_sha": "63c564dcb297248f72215a0f45052112cc69e9d68807d89f1f41f9b1ca68b109",
+      "source": "ccteam",
+      "license": "MIT",
+      "tags": []
+    },
+    {
+      "id": "cct-grok",
+      "type": "skill",
+      "name": "cct-grok",
+      "description": "Fire a fast Grok probe, second opinion, or adversarial review through ccteam and inline-wait for the answer. Use when the user says \"用 cct-grok ...\", \"问下 grok ...\", \"让 grok 看看 ...\", \"ask grok / get grok's take / quick probe with grok\", or otherwise wants a quick minute-scale answer from a Grok session routed and accounted through ccteam. This is for QUICK Q&A, code probes, bottleneck hunts, and c…",
+      "upstream": "https://raw.githubusercontent.com/firstintent/ccteam-hub/main/skills/cct-grok/SKILL.md",
+      "content_sha": "b7f06075e8c2bb5efdbb96712dd06a0e7d74c1cb6fb7d56fa2afd1a808f8552b",
+      "source": "ccteam",
+      "license": "MIT",
+      "tags": []
     },
     {
       "id": "cicd-automation-cloud-architect",
@@ -1381,7 +1403,7 @@
       "id": "gallery-researcher",
       "type": "agent",
       "name": "gallery-researcher",
-      "description": ">-",
+      "description": "Gallery search and inspiration agent. Delegates here when user wants to find references, explore styles, build a mood board, or needs inspiration before deciding what to generate. Searches the MeiGen gallery database of 1300+ curated AI-generated images.",
       "upstream": "https://raw.githubusercontent.com/wshobson/agents/cf6059d030bf4fe96623ae2e596d2f31e35fedc0/plugins/meigen-ai-design/agents/gallery-researcher.md",
       "content_sha": "77d150262cec9d902a7bf8dd2453447d8fd419b91901ca00a11364fb457d57ae",
       "source": "agency-agents",
@@ -1535,7 +1557,7 @@
       "id": "image-generator",
       "type": "agent",
       "name": "image-generator",
-      "description": ">-",
+      "description": "Image generation executor agent. Delegates here for ALL generate_image calls to keep the main conversation context clean. Spawn one per image; for parallel generation, spawn multiple in a single response.",
       "upstream": "https://raw.githubusercontent.com/wshobson/agents/cf6059d030bf4fe96623ae2e596d2f31e35fedc0/plugins/meigen-ai-design/agents/image-generator.md",
       "content_sha": "de3b7af50df7b6c609463b4ca197417354075eb84e9388e9035e755a7c3005bf",
       "source": "agency-agents",
@@ -2090,7 +2112,7 @@
       "id": "prompt-crafter",
       "type": "agent",
       "name": "prompt-crafter",
-      "description": ">-",
+      "description": "Batch prompt writing agent. Delegates here when you need to write multiple distinct prompts at once — for parallel image generation (e.g., \"5 logo concepts\"), serial-to-parallel workflows (e.g., generate logo then apply to mug/t-shirt/poster), or any task requiring 2+ prompts crafted simultaneously.",
       "upstream": "https://raw.githubusercontent.com/wshobson/agents/cf6059d030bf4fe96623ae2e596d2f31e35fedc0/plugins/meigen-ai-design/agents/prompt-crafter.md",
       "content_sha": "2275911e41e2878a25a45142ffbf91d799521df018c51249fd657787d579961f",
       "source": "agency-agents",
@@ -2598,7 +2620,7 @@
       "id": "social-publishing-publisher",
       "type": "agent",
       "name": "social-publishing-publisher",
-      "description": ">",
+      "description": "Agent-first social media publishing specialist. Use this agent to schedule and publish posts across 13 platforms (X, LinkedIn, Instagram, Facebook Pages, TikTok, Discord, Telegram, YouTube, Reddit, WordPress, Pinterest) via the SocialClaw API. Invoke for multi-platform campaigns, content scheduling, media upload, and post analytics. Requires a SocialClaw workspace API key (SOCIALCLAW_API_KEY).",
       "upstream": "https://raw.githubusercontent.com/wshobson/agents/cf6059d030bf4fe96623ae2e596d2f31e35fedc0/plugins/social-publishing/agents/social-publishing-publisher.md",
       "content_sha": "2a141bd9fb3299f0e48b8e69aaa14aeb5f8cf0154dfd560e6cd2b26d1bce4731",
       "source": "agency-agents",
@@ -2732,6 +2754,17 @@
           "content_sha": "d34d0d5e6860726151d0f6c423a0690e75d80f9d3945ae14995d292da4a41ea8"
         }
       ]
+    },
+    {
+      "id": "team-brain",
+      "type": "agent",
+      "name": "team-brain",
+      "description": "Chief-of-staff persona for a ccteam project: you chat with it from IM or the web console in plain language, and it runs your AI team — hiring Codex for long implementation grinds, Grok for minute-scale probes and second opinions, Claude for deep decomposition and merge verdicts — through the ccteam session_* tools, with every hop on the ledger. Install it, spawn a session with role \"team-brain\",…",
+      "upstream": "https://raw.githubusercontent.com/firstintent/ccteam-hub/main/agents/team-brain.md",
+      "content_sha": "eeba4725c62db505299da1254ecde01dc98c2603b93aaf4c5fc7cea200e2ae28",
+      "source": "ccteam",
+      "license": "MIT",
+      "tags": []
     },
     {
       "id": "team-collaboration-dx-optimizer",

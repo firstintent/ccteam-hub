@@ -406,28 +406,6 @@
       ]
     },
     {
-      "id": "cct-codex",
-      "type": "skill",
-      "name": "cct-codex",
-      "description": "Hand a heavy or long-running implementation/coding task to a Codex session through ccteam, then supervise it to completion. Use when the user says \"用 cct-codex ...\", \"让 codex 做 ...\", \"交给 codex 实现 ...\", \"use codex to build/implement/refactor X via ccteam\", or otherwise wants a background Codex agent to grind through work while accounted in the ccteam ledger. This is the right tool for long impleme…",
-      "upstream": "https://raw.githubusercontent.com/firstintent/ccteam-hub/main/skills/cct-codex/SKILL.md",
-      "content_sha": "63c564dcb297248f72215a0f45052112cc69e9d68807d89f1f41f9b1ca68b109",
-      "source": "ccteam",
-      "license": "MIT",
-      "tags": []
-    },
-    {
-      "id": "cct-grok",
-      "type": "skill",
-      "name": "cct-grok",
-      "description": "Fire a fast Grok probe, second opinion, or adversarial review through ccteam and inline-wait for the answer. Use when the user says \"用 cct-grok ...\", \"问下 grok ...\", \"让 grok 看看 ...\", \"ask grok / get grok's take / quick probe with grok\", or otherwise wants a quick minute-scale answer from a Grok session routed and accounted through ccteam. This is for QUICK Q&A, code probes, bottleneck hunts, and c…",
-      "upstream": "https://raw.githubusercontent.com/firstintent/ccteam-hub/main/skills/cct-grok/SKILL.md",
-      "content_sha": "b7f06075e8c2bb5efdbb96712dd06a0e7d74c1cb6fb7d56fa2afd1a808f8552b",
-      "source": "ccteam",
-      "license": "MIT",
-      "tags": []
-    },
-    {
       "id": "cicd-automation-cloud-architect",
       "type": "agent",
       "name": "cicd-automation-cloud-architect",
